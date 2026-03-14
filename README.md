@@ -81,11 +81,11 @@ The application uses a relational schema managed via Drizzle ORM:
 
 **Harini Jeyashree**
 
-* GitHub: [@HariniJeyashree](https://www.google.com/search?q=https://github.com/HariniJeyashree)
-* LinkedIn: [Your Profile Link Here]
+* GitHub: [@HariniJeyashree](https://github.com/HariniJeyashree)
+* LinkedIn: [LinkedIN](https://www.linkedin.com/in/harinijeyashree/)
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+This project is licensed under the **MIT License**
 
 ```
