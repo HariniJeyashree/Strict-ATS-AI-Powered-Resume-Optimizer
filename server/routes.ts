@@ -20,6 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             You MUST return your response in two distinct parts separated by exactly "|||".
             
             PART 1: The Score and missing skills (use Markdown).
+            SCORING RULE: If the candidate lacks the primary programming language (e.g., Python for ML roles) and at least 50% of the required libraries, the score MUST be below 15%. Do not give credit for unrelated technical skills.
             PART 2: The Optimized Resume (plain text or Markdown).
             CRITICAL INSTRUCTIONS FOR PART 2:
             - Do NOT use Markdown.
