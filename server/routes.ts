@@ -2,87 +2,89 @@ import { type Express } from "express";
 import { createServer, type Server } from "http";
 import Groq from "groq-sdk";
 import { storage } from "./storage.js";
-import { insertCheckSchema } from "../shared/schema.js";
+import { db } from "./db.js";
+import { checks } from "../shared/schema.js";
 
-// Initialize Groq with the API Key from Environment Variables
-const groq = new Groq({ 
-  apiKey: process.env.GROQ_API_KEY 
-});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // 1. GET HISTORY: Fetches all previous scans from the database
   app.get("/api/history", async (_req, res) => {
     try {
       const data = await storage.getChecks();
       res.json(data || []);
     } catch (e) {
-      console.error("History Fetch Error:", e);
       res.status(500).json({ error: "Failed to fetch history" });
     }
   });
 
-  // 2. ANALYZE RESUME: Core logic for AI analysis and database storage
   app.post("/api/analyze", async (req, res) => {
     try {
       const { content, filename, jd } = req.body;
       
-      // Basic validation
       if (!content || !jd) {
-        return res.status(400).json({ error: "Resume content and JD are required." });
+        return res.status(400).json({ error: "Resume and JD are required." });
       }
 
-      console.log(`🚀 Starting analysis for: ${filename || "Untitled Scan"}`);
+      console.log(`🔍 STRICT ANALYSIS START: ${filename}`);
 
-      // Check if AI key is configured
-      if (!process.env.GROQ_API_KEY) {
-        console.error("❌ MISSING KEY: GROQ_API_KEY is not defined in Render environment variables.");
-        return res.status(500).json({ error: "Server AI configuration missing." });
+      // 1. AI STRICT COMPLETION
+      // Using 8b-instant to stay within Render's free tier response window
+      let aiResponse: string;
+      try {
+        const completion = await groq.chat.completions.create({
+          messages: [
+            { 
+              role: "system", 
+              content: `You are a Strict ATS Compliance Auditor. 
+              Evaluate the resume against the Job Description with 0% bias.
+              
+              STRUCTURE YOUR RESPONSE AS FOLLOWS:
+              [ATS SCORE: 0-100]
+              
+              CRITICAL FAILURES:
+              (List missing keywords or formatting issues)
+              
+              OPTIMIZATION STRATEGY:
+              (List specific changes needed)
+              
+              ---RESUME_START---
+              (Provide the rewritten resume text incorporating all JD keywords)` 
+            },
+            { role: "user", content: `RESUME CONTENT:\n${content}\n\nTARGET JD:\n${jd}` }
+          ],
+          model: "llama-3.1-8b-instant",
+          temperature: 0.1, // Low temperature for consistent, strict results
+        });
+        
+        aiResponse = completion.choices[0]?.message?.content || "";
+        if (!aiResponse) throw new Error("AI returned empty content");
+        
+      } catch (aiErr: any) {
+        console.error("❌ GROQ FAILURE:", aiErr.message);
+        return res.status(500).json({ error: `AI Timeout/Error: ${aiErr.message}` });
       }
 
-      // AI Analysis Call
-      // Using 'llama-3.1-8b-instant' for fast response times on Render's Free Tier
-      const completion = await groq.chat.completions.create({
-        messages: [
-          { 
-            role: "system", 
-            content: `You are a Senior Recruiter and ATS Expert. 
-            Analyze the resume against the JD and format your response EXACTLY like this:
-            [ATS SCORE: X/100]
-            FEEDBACK
-            (Strategic point-form feedback)
-            ---RESUME_START---
-            (The full optimized resume text using keywords from the JD)`
-          },
-          { role: "user", content: `RESUME:\n${content}\n\nJD:\n${jd}` }
-        ],
-        model: "llama-3.1-8b-instant",
-      });
-
-      const analysisResult = completion.choices[0]?.message?.content || "Analysis failed to generate.";
-
-      // Database Insertion via Storage Class
-      // This saves the result to the 'checks' table
-      const inserted = await storage.createCheck({
-        filename: filename || "Untitled Scan",
-        content: content,
-        analysis: analysisResult,
-      });
-
-      console.log("✅ Analysis Saved Successfully. ID:", inserted.id);
-      res.json(inserted);
+      // 2. DATABASE PERSISTENCE
+      try {
+        const [inserted] = await db.insert(checks).values({
+          filename: filename || "Strict_Analysis_Result",
+          content: content,
+          analysis: aiResponse,
+        }).returning();
+        
+        console.log("✅ ANALYSIS PERSISTED: ID", inserted.id);
+        return res.json(inserted);
+      } catch (dbErr: any) {
+        console.error("❌ DATABASE SYNC FAILURE:", dbErr.message);
+        return res.status(500).json({ error: `Database Error: ${dbErr.message}` });
+      }
 
     } catch (error: any) {
-      // Log the full error to the Render terminal for debugging
-      console.error("❌ CRITICAL API ERROR:", error);
-      
-      res.status(500).json({ 
-        error: "Database Sync Error or AI Timeout. Please try again.",
-        details: error.message 
-      });
+      console.error("❌ UNEXPECTED ERROR:", error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  return createServer(app);
 }
