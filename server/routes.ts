@@ -16,7 +16,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [
           { 
             role: "system", 
-            content: `You are a Strict ATS Auditor. 
+            content: `You are a Strict ATS Auditor. Be extremely strict. If 0 required skills overlap, the score must be below 10%.
             You MUST return your response in two distinct parts separated by exactly "|||".
             
             PART 1: The Score and missing skills (use Markdown).
