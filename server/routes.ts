@@ -2,7 +2,7 @@ import { type Express } from "express";
 import { createServer, type Server } from "http";
 import Groq from "groq-sdk";
 import { db } from "./db.js";
-import { resumes } from "../shared/schema.js";
+import { checks } from "../shared/schema.js";
 import { desc } from "drizzle-orm";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -11,7 +11,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET HISTORY
   app.get("/api/history", async (_req, res) => {
     try {
-      const data = await db.select().from(resumes).orderBy(desc(resumes.createdAt));
+      const data = await db.select().from(checks).orderBy(desc(checks.createdAt));
       res.json(data || []);
     } catch (e) {
       console.error("History Fetch Error:", e);
@@ -57,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 3. Database Insertion with Safety Defaults
       // This prevents the "Failed Query" error from your screenshot
-      const [inserted] = await db.insert(resumes).values({
+      const [inserted] = await db.insert(checks).values({
         filename: String(filename || "Untitled Scan").trim(),
         content: String(content).trim(),
         analysis: String(analysisResult).trim(),

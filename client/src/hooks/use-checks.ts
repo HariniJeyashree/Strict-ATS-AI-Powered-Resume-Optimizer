@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { type Check } from "../../../shared/schema";
+import { type Check } from "../../../shared/schema.js";
 
 export function useChecks() {
   return useQuery<Check[]>({
