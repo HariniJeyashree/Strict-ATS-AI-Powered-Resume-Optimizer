@@ -55,6 +55,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Analysis failed" });
     }
   });
+  // server/routes.ts
+
+// Change your GET /api/history route to this:
+app.get("/api/history", async (_req, res) => {
+  try {
+    // Import 'desc' from drizzle-orm and 'checks' from your schema
+    const { desc } = await import("drizzle-orm");
+    
+    // Fetch all records, ordered by newest first
+    const data = await db.select().from(checks).orderBy(desc(checks.id));
+    
+    res.json(data);
+  } catch (e: any) {
+    console.error("History Fetch Error:", e.message);
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
 
   return createServer(app);
 }
