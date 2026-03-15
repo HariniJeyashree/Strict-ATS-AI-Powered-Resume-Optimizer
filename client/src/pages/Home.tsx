@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient.js";
 import { jsPDF } from "jspdf";
 import { 
-  History, Send, Loader2, Plus, Download, Zap, Award, Target, FileText, Cpu, ChevronRight
+  History, Send, Loader2, Plus, Download, Zap, Award, Target, FileText, Cpu, ChevronRight, Copy, CheckCircle2
 } from "lucide-react";
 
 export default function Home() {
@@ -12,8 +12,8 @@ export default function Home() {
   const [filename, setFilename] = useState("");
   const [selected, setSelected] = useState<any>(null);
   const [status, setStatus] = useState("ANALYZE RESUME");
+  const [copied, setCopied] = useState(false);
 
-  // Fetch history with a safety catch to prevent UI vanishing on server error
   const { data: history = [] } = useQuery({
     queryKey: ["/api/history"],
     queryFn: () => fetch("/api/history").then(res => res.json()).catch(() => []),
@@ -41,6 +41,10 @@ export default function Home() {
         queryClient.invalidateQueries({ queryKey: ["/api/history"] });
         setSelected(data);
         setStatus("ANALYSE RESUME");
+        // Clear inputs for next scan
+        setContent("");
+        setJd("");
+        setFilename("");
       }, 800);
     },
     onError: (error: any) => {
@@ -49,31 +53,33 @@ export default function Home() {
     }
   });
 
-  // Critical Logic: Safely splits the AI text so the UI doesn't crash
+  // Split logic to separate Feedback from the Resume
   const splitResult = (raw: string) => {
-  if (!raw) return { score: "0", feedback: "Analyzing...", resume: "" };
+    if (!raw) return { score: "0", feedback: "Analyzing...", resume: "" };
 
-  // 1. Look for the standard [ATS SCORE: 85]
-  let scoreMatch = raw.match(/score[:\s-]*(\d+)/i);
-  
-  // 2. If that fails, just grab the very first number found in the text
-  if (!scoreMatch) {
-    scoreMatch = raw.match(/(\d+)/);
-  }
+    // Support both the new ||| separator and the old ---RESUME_START--- fallback
+    const separator = raw.includes("|||") ? "|||" : "---RESUME_START---";
+    const parts = raw.split(separator);
+    
+    const feedbackPart = parts[0] || "";
+    const resumePart = parts[1] || "";
 
-  // 3. Clean the result: ensure it's just the number, default to 0
-  const score = scoreMatch ? scoreMatch[1] : "0";
+    // Extract score: looks for [ATS SCORE: 85] or just a number
+    let scoreMatch = feedbackPart.match(/score[:\s-]*(\d+)/i) || feedbackPart.match(/(\d+)/);
+    const score = scoreMatch ? scoreMatch[1] : "0";
 
-  const parts = raw.split("---RESUME_START---");
-  
-  return { 
-    score,
-    feedback: parts[0].replace(/\[ATS SCORE: \d+\]/i, "").trim(), 
-    resume: parts[1] || "" 
+    return { 
+      score,
+      feedback: feedbackPart.replace(/\[ATS SCORE: \d+\]/i, "").trim(), 
+      resume: resumePart.trim() 
+    };
   };
-};
 
-// Developed by [HARINI JEYASHREE A] — 2026
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const downloadPDF = (name: string, text: string) => {
     try {
@@ -86,70 +92,42 @@ export default function Home() {
       doc.text(lines, 10, 30);
       doc.save(`${name.replace(/\s+/g, '_')}_Optimized.pdf`);
     } catch (err) {
-      alert("PDF Generation Failed. Ensure jspdf is installed.");
+      alert("PDF Generation Failed.");
     }
   };
 
   return (
     <div className="flex h-screen bg-[#020617] text-slate-100 overflow-hidden font-sans">
-      {/* Interactive Loading Overlay */}
       {mutation.isPending && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#020617]/90 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#020617]/90 backdrop-blur-md">
           <div className="relative mb-8">
             <div className="w-24 h-24 border-2 border-blue-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
             <Cpu className="absolute inset-0 m-auto text-blue-400 animate-pulse" size={32} />
           </div>
           <h2 className="text-sm font-black tracking-[0.6em] text-white uppercase animate-pulse">{status}</h2>
-          <p className="text-slate-500 font-mono text-[9px] mt-4 uppercase tracking-widest">Cross-referencing JD Keywords...</p>
         </div>
       )}
 
-      {/* Sidebar */}
-      {/* Sidebar */}
       <aside className="w-64 bg-[#0b1120] border-r border-blue-500/10 flex flex-col shadow-2xl">
         <div className="p-6 border-b border-blue-500/10 flex justify-between items-center">
           <span className="text-blue-400 font-black text-[10px] tracking-[0.2em] flex items-center gap-2">
             <Cpu size={14}/> SYSTEM LOGS
           </span>
-          {/* This is the button you mentioned */}
-          <button 
-            onClick={() => setSelected(null)} 
-            className="p-1 hover:bg-blue-500/10 border border-blue-500/20 rounded-md transition-all"
-            aria-label="create new scan"
-          >
+          <button onClick={() => setSelected(null)} className="p-1 hover:bg-blue-500/10 border border-blue-500/20 rounded-md transition-all" aria-label="create new scan">
             <Plus size={16}/>
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {history && history.length > 0 ? (
-            history.map((h: any) => (
-              <button 
-                key={h.id} 
-                onClick={() => setSelected(h)} 
-                className={`w-full text-left p-3 rounded-lg text-xs transition-all ${
-                  selected?.id === h.id 
-                    ? 'bg-blue-600/20 border border-blue-500/50 text-white shadow-[0_0_15px_rgba(37,99,235,0.1)]' 
-                    : 'text-slate-500 hover:bg-slate-800/50'
-                }`}
-              >
-                <div className="font-bold truncate uppercase tracking-tighter">
-                  {h.filename || "Untitled Scan"}
-                </div>
-                <div className="opacity-40 text-[9px] mt-1">
-                  {h.createdAt ? new Date(h.createdAt).toLocaleDateString() : 'Recent'}
-                </div>
-              </button>
-            ))
-          ) : (
-            <div className="p-4 text-[10px] text-slate-600 font-mono italic text-center mt-10">
-              No recent scans detected...
-            </div>
-          )}
+          {history.map((h: any) => (
+            <button key={h.id} onClick={() => setSelected(h)} className={`w-full text-left p-3 rounded-lg text-xs transition-all ${selected?.id === h.id ? 'bg-blue-600/20 border border-blue-500/50 text-white' : 'text-slate-500 hover:bg-slate-800/50'}`}>
+              <div className="font-bold truncate uppercase tracking-tighter">{h.filename || "Untitled Scan"}</div>
+              <div className="opacity-40 text-[9px] mt-1">{h.createdAt ? new Date(h.createdAt).toLocaleDateString() : 'Recent'}</div>
+            </button>
+          ))}
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto p-8 lg:p-12 bg-[radial-gradient(circle_at_top_right,_#1e1b4b_0%,_#020617_60%)]">
         <div className="max-w-6xl mx-auto">
           {selected ? (
@@ -168,34 +146,38 @@ export default function Home() {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Feedback Panel */}
-                <div className="bg-[#0b1120]/60 backdrop-blur-xl p-8 rounded-[2rem] border border-blue-500/20 shadow-2xl overflow-hidden relative">
-                   <div className="absolute top-0 right-0 p-4 opacity-5"><Award size={100}/></div>
+                <div className="bg-[#0b1120]/60 backdrop-blur-xl p-8 rounded-[2rem] border border-blue-500/20 shadow-2xl relative">
                   <h3 className="text-blue-400 font-black text-[10px] tracking-widest mb-6 uppercase flex items-center gap-2"><Award size={14}/> Resume Analysis</h3>
                   <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono italic">
                     {splitResult(selected.analysis).feedback}
                   </div>
                 </div>
 
-                {/* Optimized Resume Panel */}
                 <div className="bg-[#0b1120]/60 backdrop-blur-xl p-8 rounded-[2rem] border border-cyan-500/20 shadow-2xl relative">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-cyan-400 font-black text-[10px] tracking-widest uppercase flex items-center gap-2"><Zap size={14} className="fill-cyan-400"/> Optimized Resume</h3>
-                    <button 
-                      onClick={() => downloadPDF(selected.filename, splitResult(selected.analysis).resume)}
-                      className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(8,145,178,0.3)] active:scale-95"
-                    >
-                      <Download size={14}/> PDF
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleCopy(splitResult(selected.analysis).resume)}
+                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex items-center gap-2"
+                      >
+                        {copied ? <CheckCircle2 size={14} className="text-emerald-400"/> : <Copy size={14}/>} {copied ? "COPIED" : "COPY"}
+                      </button>
+                      <button 
+                        onClick={() => downloadPDF(selected.filename, splitResult(selected.analysis).resume)}
+                        className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(8,145,178,0.3)]"
+                      >
+                        <Download size={14}/> PDF
+                      </button>
+                    </div>
                   </div>
-                  <div className="bg-black/40 p-6 rounded-2xl h-[500px] overflow-y-auto border border-white/5 text-slate-300 font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-all">
+                  <div className="bg-black/40 p-6 rounded-2xl h-[500px] overflow-y-auto border border-white/5 text-slate-300 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
                     {splitResult(selected.analysis).resume}
                   </div>
                 </div>
               </div>
             </div>
           ) : (
-            /* Input Section */
             <div className="space-y-12 max-w-4xl mx-auto">
               <header className="text-center space-y-4">
                 <h1 className="text-8xl font-black text-white tracking-tighter italic">STRICT <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]">ATS</span></h1>
@@ -221,10 +203,7 @@ export default function Home() {
 
                 <button 
                   disabled={mutation.isPending || !content || !jd}
-                  onClick={() => {
-                    console.log("Initializing AI Request...");
-                    mutation.mutate({ content, filename, jd });
-                  }}
+                  onClick={() => mutation.mutate({ content, filename, jd })}
                   className={`w-full py-6 rounded-3xl font-black text-white tracking-[0.4em] transition-all transform active:scale-95 flex items-center justify-center gap-3
                     ${mutation.isPending 
                       ? "bg-slate-800 opacity-50 cursor-not-allowed" 
