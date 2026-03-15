@@ -1,17 +1,20 @@
 import { type Express } from "express";
 import { createServer, type Server } from "http";
 import Groq from "groq-sdk";
-import { db } from "./db.js";
-import { checks } from "../shared/schema.js";
-import { desc } from "drizzle-orm";
+import { storage } from "./storage.js";
+import { insertCheckSchema } from "../shared/schema.js";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Initialize Groq with the API Key from Environment Variables
+const groq = new Groq({ 
+  apiKey: process.env.GROQ_API_KEY 
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // GET HISTORY
+  
+  // 1. GET HISTORY: Fetches all previous scans from the database
   app.get("/api/history", async (_req, res) => {
     try {
-      const data = await db.select().from(checks).orderBy(desc(checks.createdAt));
+      const data = await storage.getChecks();
       res.json(data || []);
     } catch (e) {
       console.error("History Fetch Error:", e);
@@ -19,59 +22,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ANALYZE RESUME
+  // 2. ANALYZE RESUME: Core logic for AI analysis and database storage
   app.post("/api/analyze", async (req, res) => {
     try {
-      // 1. Validate incoming request body
       const { content, filename, jd } = req.body;
       
+      // Basic validation
       if (!content || !jd) {
         return res.status(400).json({ error: "Resume content and JD are required." });
       }
 
-      console.log(`Checking Resume: ${filename || "Untitled"}`);
+      console.log(`🚀 Starting analysis for: ${filename || "Untitled Scan"}`);
 
+      // Check if AI key is configured
       if (!process.env.GROQ_API_KEY) {
-        throw new Error("GROQ_API_KEY is missing in .env");
+        console.error("❌ MISSING KEY: GROQ_API_KEY is not defined in Render environment variables.");
+        return res.status(500).json({ error: "Server AI configuration missing." });
       }
 
-      // 2. AI Completion
+      // AI Analysis Call
+      // Using 'llama-3.1-8b-instant' for fast response times on Render's Free Tier
       const completion = await groq.chat.completions.create({
         messages: [
           { 
             role: "system", 
             content: `You are a Senior Recruiter and ATS Expert. 
-            Format your response EXACTLY like this:
+            Analyze the resume against the JD and format your response EXACTLY like this:
             [ATS SCORE: X/100]
-             FEEDBACK
+            FEEDBACK
             (Strategic point-form feedback)
             ---RESUME_START---
             (The full optimized resume text using keywords from the JD)`
           },
           { role: "user", content: `RESUME:\n${content}\n\nJD:\n${jd}` }
         ],
-        model: "llama-3.3-70b-versatile",
+        model: "llama-3.1-8b-instant",
       });
 
-      const analysisResult = completion.choices[0]?.message?.content || "";
+      const analysisResult = completion.choices[0]?.message?.content || "Analysis failed to generate.";
 
-      // 3. Database Insertion with Safety Defaults
-      // This prevents the "Failed Query" error from your screenshot
-      const [inserted] = await db.insert(checks).values({
-        filename: String(filename || "Untitled Scan").trim(),
-        content: String(content).trim(),
-        analysis: String(analysisResult).trim(),
-      }).returning();
+      // Database Insertion via Storage Class
+      // This saves the result to the 'checks' table
+      const inserted = await storage.createCheck({
+        filename: filename || "Untitled Scan",
+        content: content,
+        analysis: analysisResult,
+      });
 
-      console.log("Analysis Saved Successfully");
+      console.log("✅ Analysis Saved Successfully. ID:", inserted.id);
       res.json(inserted);
 
     } catch (error: any) {
-      console.error("AI Analysis Error:", error.message);
-      // Sending back a clean error message so the button doesn't show 5 lines of SQL code
-      res.status(500).json({ error: "Database Sync Error or AI Timeout. Please try again." });
+      // Log the full error to the Render terminal for debugging
+      console.error("❌ CRITICAL API ERROR:", error);
+      
+      res.status(500).json({ 
+        error: "Database Sync Error or AI Timeout. Please try again.",
+        details: error.message 
+      });
     }
   });
 
-  return createServer(app);
+  const httpServer = createServer(app);
+  return httpServer;
 }
