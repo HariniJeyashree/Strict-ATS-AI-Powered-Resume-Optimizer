@@ -19,7 +19,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             content: `You are a Strict ATS Auditor. 
             You MUST return your response in two distinct parts separated by exactly "|||".
             
-            PART 1: The Score and Feedback (use Markdown).
+            PART 1: The Score and missing skills (use Markdown).
             PART 2: The Optimized Resume (plain text or Markdown).
             
             Example:
