@@ -2,7 +2,9 @@ import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const resumes = pgTable("resumes", {
+// We keep the variable name 'checks' so storage.ts can find it
+// We also name the database table 'checks' for consistency
+export const checks = pgTable("checks", {
   id: serial("id").primaryKey(),
   filename: text("filename").notNull(),
   content: text("content").notNull(),
@@ -10,6 +12,7 @@ export const resumes = pgTable("resumes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertResumeSchema = createInsertSchema(resumes);
-export type InsertResume = z.infer<typeof insertResumeSchema>;
-export type Resume = typeof resumes.$inferSelect;
+// These must use the 'checks' variable defined above
+export const insertCheckSchema = createInsertSchema(checks);
+export type InsertCheck = z.infer<typeof insertCheckSchema>;
+export type Check = typeof checks.$inferSelect;
