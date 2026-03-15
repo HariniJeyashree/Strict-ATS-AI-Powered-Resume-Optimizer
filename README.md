@@ -84,6 +84,8 @@ The application uses a relational schema managed via Drizzle ORM:
 * GitHub: [@HariniJeyashree](https://github.com/HariniJeyashree)
 * LinkedIn: [LinkedIN](https://www.linkedin.com/in/harinijeyashree/)
 
+"Note: The demo is hosted on a free tier; please allow 30-60 seconds for the initial 'cold start' load."
+
 ## 📄 License
 
 This project is licensed under the **MIT License**
