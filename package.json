@@ -33,7 +33,10 @@
     "tailwind-merge": "^2.2.1",
     "tailwindcss": "^4.2.1",
     "ws": "^8.19.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.1.4"
   },
   "devDependencies": {
     "@types/express": "^4.17.25",
@@ -43,9 +46,6 @@
     "@vitejs/plugin-react": "^4.2.1",
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vite": "^5.1.4"
+    "ts-node": "^10.9.2"
   }
 }
