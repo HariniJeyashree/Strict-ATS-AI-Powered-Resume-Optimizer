@@ -21,6 +21,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             PART 1: The Score and missing skills (use Markdown).
             PART 2: The Optimized Resume (plain text or Markdown).
+            CRITICAL INSTRUCTIONS FOR PART 2:
+            - Do NOT use Markdown.
+            - Do NOT use '#' for headers; use ALL CAPS for section titles instead.
+            - Do NOT use '**' for bolding; the text must be plain.
+            - Do NOT use '*' for bullets; use a standard dash (-) or indentation.
+            - Ensure the output is clean plain text that looks like a final resume document.
             
             Example:
             [ATS SCORE: 85/100]
